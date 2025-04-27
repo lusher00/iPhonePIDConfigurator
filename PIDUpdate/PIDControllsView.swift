@@ -6,6 +6,11 @@ struct PIDControlsView: View {
     @State private var dGain: Float = 0.0
     @State private var ang: Float = 0.0
 
+    @State private var pText: String = "0.00"
+    @State private var iText: String = "0.00"
+    @State private var dText: String = "0.00"
+    @State private var angText: String = "0.00"
+
     @State private var idx: Int = 1
     @State private var holdPosition: Int = 0
 
@@ -20,10 +25,10 @@ struct PIDControlsView: View {
     var body: some View {
         VStack(spacing: 12) {
             VStack(spacing: 12) {
-                tuningRow(label: "P", binding: $pGain)
-                tuningRow(label: "I", binding: $iGain)
-                tuningRow(label: "D", binding: $dGain)
-                tuningRow(label: "ANG", binding: $ang)
+                tuningRow(label: "P", text: $pText, value: $pGain)
+                tuningRow(label: "I", text: $iText, value: $iGain)
+                tuningRow(label: "D", text: $dText, value: $dGain)
+                tuningRow(label: "ANG", text: $angText, value: $ang)
             }
             .padding()
             .background(Color(.secondarySystemGroupedBackground))
@@ -59,27 +64,46 @@ struct PIDControlsView: View {
         .padding()
     }
 
-    private func tuningRow(label: String, binding: Binding<Float>) -> some View {
+    private func tuningRow(label: String, text: Binding<String>, value: Binding<Float>) -> some View {
         HStack(spacing: 8) {
             Text(label)
                 .frame(width: 50, alignment: .leading)
 
             Button("-") {
-                binding.wrappedValue -= 0.01
+                if let current = Float(text.wrappedValue) {
+                    let newValue = current - 0.01
+                    text.wrappedValue = String(format: "%.2f", newValue)
+                    value.wrappedValue = newValue
+                }
             }
             .frame(width: 28, height: 28)
             .buttonStyle(.bordered)
 
-            TextField("0.00", value: binding, formatter: numberFormatter)
+            TextField("0.00", text: text)
                 .keyboardType(.decimalPad)
                 .frame(width: 60, height: 28)
                 .padding(.horizontal, 4)
                 .background(Color(.systemGray6))
                 .cornerRadius(6)
                 .multilineTextAlignment(.trailing)
+                .onSubmit {
+                    if let newValue = Float(text.wrappedValue) {
+                        value.wrappedValue = newValue
+                    }
+                }
+                .onChange(of: text.wrappedValue) { newValue in
+                    // If completely deleted, don't reset immediately
+                    if let newVal = Float(newValue) {
+                        value.wrappedValue = newVal
+                    }
+                }
 
             Button("+") {
-                binding.wrappedValue += 0.01
+                if let current = Float(text.wrappedValue) {
+                    let newValue = current + 0.01
+                    text.wrappedValue = String(format: "%.2f", newValue)
+                    value.wrappedValue = newValue
+                }
             }
             .frame(width: 28, height: 28)
             .buttonStyle(.bordered)
@@ -143,12 +167,16 @@ struct PIDControlsView: View {
                                 }
                             case "angadj":
                                 self.ang = Float(valueString) ?? 0.0
+                                self.angText = String(format: "%.2f", self.ang)
                             case "p":
                                 self.pGain = Float(valueString) ?? 0.0
+                                self.pText = String(format: "%.2f", self.pGain)
                             case "i":
                                 self.iGain = Float(valueString) ?? 0.0
+                                self.iText = String(format: "%.2f", self.iGain)
                             case "d":
                                 self.dGain = Float(valueString) ?? 0.0
+                                self.dText = String(format: "%.2f", self.dGain)
                             default:
                                 break
                             }
