@@ -14,21 +14,19 @@ struct PIDControlsView: View {
     @State private var idx: Int = 1
     @State private var holdPosition: Int = 0
 
-    private let numberFormatter: NumberFormatter = {
-        let formatter = NumberFormatter()
-        formatter.minimumFractionDigits = 2
-        formatter.maximumFractionDigits = 2
-        formatter.alwaysShowsDecimalSeparator = true
-        return formatter
-    }()
+    @FocusState private var focusedField: Field?
+
+    enum Field {
+        case pGain, iGain, dGain, ang
+    }
 
     var body: some View {
         VStack(spacing: 12) {
             VStack(spacing: 12) {
-                tuningRow(label: "P", text: $pText, value: $pGain)
-                tuningRow(label: "I", text: $iText, value: $iGain)
-                tuningRow(label: "D", text: $dText, value: $dGain)
-                tuningRow(label: "ANG", text: $angText, value: $ang)
+                tuningRow(label: "P", text: $pText, value: $pGain, field: .pGain)
+                tuningRow(label: "I", text: $iText, value: $iGain, field: .iGain)
+                tuningRow(label: "D", text: $dText, value: $dGain, field: .dGain)
+                tuningRow(label: "ANG", text: $angText, value: $ang, field: .ang)
             }
             .padding()
             .background(Color(.secondarySystemGroupedBackground))
@@ -64,7 +62,7 @@ struct PIDControlsView: View {
         .padding()
     }
 
-    private func tuningRow(label: String, text: Binding<String>, value: Binding<Float>) -> some View {
+    private func tuningRow(label: String, text: Binding<String>, value: Binding<Float>, field: Field) -> some View {
         HStack(spacing: 8) {
             Text(label)
                 .frame(width: 50, alignment: .leading)
@@ -79,24 +77,14 @@ struct PIDControlsView: View {
             .frame(width: 28, height: 28)
             .buttonStyle(.bordered)
 
-            TextField("0.00", text: text)
-                .keyboardType(.decimalPad)
-                .frame(width: 60, height: 28)
-                .padding(.horizontal, 4)
-                .background(Color(.systemGray6))
-                .cornerRadius(6)
-                .multilineTextAlignment(.trailing)
-                .onSubmit {
-                    if let newValue = Float(text.wrappedValue) {
-                        value.wrappedValue = newValue
-                    }
-                }
-                .onChange(of: text.wrappedValue) { newValue in
-                    // If completely deleted, don't reset immediately
-                    if let newVal = Float(newValue) {
-                        value.wrappedValue = newVal
-                    }
-                }
+            ZStack {
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(Color(.systemGray6))
+                    .frame(width: 60, height: 28)
+
+                CustomTextField(text: text, keyboardType: .decimalPad)
+                    .frame(width: 60, height: 28)
+            }
 
             Button("+") {
                 if let current = Float(text.wrappedValue) {
