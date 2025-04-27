@@ -1,10 +1,3 @@
-//
-//  GraphView.swift
-//  
-//
-//  Created by Ryan Lush on 4/26/25.
-//
-
 import SwiftUI
 
 struct GraphView: View {
@@ -17,6 +10,8 @@ struct GraphView: View {
     @State private var showI = false
     @State private var showD = false
     @State private var showOutput = true
+
+    @State private var showLegend = false
 
     private let colors: [String: Color] = [
         "Setpoint": .blue,
@@ -79,25 +74,42 @@ struct GraphView: View {
                         drawLine(context: context, points: pointsArray.map { $0.output }, color: colors["Output"] ?? .black, size: size, xStep: xStep, yFunc: yPosition)
                     }
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)  // <-- FORCE canvas to fill
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Color.white)
-                
-                Button(action: {
-                            showSettingsSheet.toggle()
-                        }) {
-                            Image(systemName: "ellipsis.circle.fill")
-                                .resizable()
-                                .frame(width: 28, height: 28)
-                                .padding(8)
-                                .padding(.trailing, 12)
-                                .foregroundColor(.blue)
+                .gesture(
+                    DragGesture()
+                        .onEnded { value in
+                            if value.translation.width < -50 {
+                                withAnimation { showLegend = true }
+                            } else if value.translation.width > 50 {
+                                withAnimation { showLegend = false }
+                            }
                         }
-                 
+                )
+
+                Button(action: {
+                    showSettingsSheet.toggle()
+                }) {
+                    Image(systemName: "ellipsis.circle.fill")
+                        .resizable()
+                        .frame(width: 28, height: 28)
+                        .padding(8)
+                        .padding(.trailing, 12)
+                        .foregroundColor(.blue)
+                }
+
+                if showLegend {
+                    legendView
+                        .frame(width: 160)
+                        .background(.ultraThinMaterial)
+                        .cornerRadius(10)
+                        .transition(.move(edge: .trailing))
+                        .padding(.trailing, 8)
+                }
             }
             
             scrollableCheckboxes()
-            
-            .padding(.bottom)
+                .padding(.bottom)
         }
     }
 
@@ -113,7 +125,7 @@ struct GraphView: View {
                 Toggle("Out", isOn: $showOutput)
             }
             .padding()
-            .font(.headline)  // << MOVE IT HERE attached to the HStack!
+            .font(.headline)
         }
     }
 
@@ -129,5 +141,51 @@ struct GraphView: View {
             }
         }
         context.stroke(path, with: .color(color), lineWidth: 2)
+    }
+
+    private var legendView: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if let latest = dataPoints.last {
+                ForEach(signalInfos, id: \.label) { info in
+                    if info.isVisible {
+                        HStack {
+                            RoundedRectangle(cornerRadius: 2)
+                                .fill(info.color)
+                                .frame(width: 12, height: 12)
+                            VStack(alignment: .leading) {
+                                Text(info.label)
+                                    .font(.caption)
+                                Text(String(format: "%.2f", info.value(from: latest)))
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .padding()
+    }
+
+    private var signalInfos: [SignalInfo] {
+        [
+            SignalInfo(label: "Setpoint", color: .blue, keyPath: \.setpoint, isVisible: showSetpoint),
+            SignalInfo(label: "Error", color: .red, keyPath: \.error, isVisible: showError),
+            SignalInfo(label: "P", color: .green, keyPath: \.p, isVisible: showP),
+            SignalInfo(label: "I", color: .purple, keyPath: \.i, isVisible: showI),
+            SignalInfo(label: "D", color: .orange, keyPath: \.d, isVisible: showD),
+            SignalInfo(label: "Output", color: .black, keyPath: \.output, isVisible: showOutput)
+        ]
+    }
+}
+
+struct SignalInfo {
+    let label: String
+    let color: Color
+    let keyPath: KeyPath<DebugDataPoint, Float>
+    let isVisible: Bool
+
+    func value(from point: DebugDataPoint) -> Float {
+        return point[keyPath: keyPath]
     }
 }
