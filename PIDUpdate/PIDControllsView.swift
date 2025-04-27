@@ -26,7 +26,7 @@ struct PIDControlsView: View {
                 tuningRow(label: "ANG", binding: $ang)
             }
             .padding()
-            .background(Color(.secondarySystemGroupedBackground)) // full gray background
+            .background(Color(.secondarySystemGroupedBackground))
             .cornerRadius(16)
             .frame(maxWidth: .infinity)
 
@@ -74,7 +74,7 @@ struct PIDControlsView: View {
                 .keyboardType(.decimalPad)
                 .frame(width: 60, height: 28)
                 .padding(.horizontal, 4)
-                .background(Color(.systemGray6))  // light gray behind textbox
+                .background(Color(.systemGray6))
                 .cornerRadius(6)
                 .multilineTextAlignment(.trailing)
 
