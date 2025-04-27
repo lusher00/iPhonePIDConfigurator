@@ -14,24 +14,12 @@ struct PIDControlsView: View {
     @State private var idx: Int = 1
     @State private var holdPosition: Int = 0
 
-    @FocusState private var focusedField: Field?
-
-    enum Field {
-        case pGain, iGain, dGain, ang
-    }
-
     var body: some View {
         VStack(spacing: 12) {
-            VStack(spacing: 12) {
-                tuningRow(label: "P", text: $pText, value: $pGain, field: .pGain)
-                tuningRow(label: "I", text: $iText, value: $iGain, field: .iGain)
-                tuningRow(label: "D", text: $dText, value: $dGain, field: .dGain)
-                tuningRow(label: "ANG", text: $angText, value: $ang, field: .ang)
-            }
-            .padding()
-            .background(Color(.secondarySystemGroupedBackground))
-            .cornerRadius(16)
-            .frame(maxWidth: .infinity)
+            tuningRow(label: "P", text: $pText, value: $pGain)
+            tuningRow(label: "I", text: $iText, value: $iGain)
+            tuningRow(label: "D", text: $dText, value: $dGain)
+            tuningRow(label: "ANG", text: $angText, value: $ang)
 
             HStack(spacing: 20) {
                 Button("Send") {
@@ -59,10 +47,9 @@ struct PIDControlsView: View {
             }
             .padding(.top, 4)
         }
-        .padding()
     }
 
-    private func tuningRow(label: String, text: Binding<String>, value: Binding<Float>, field: Field) -> some View {
+    private func tuningRow(label: String, text: Binding<String>, value: Binding<Float>) -> some View {
         HStack(spacing: 8) {
             Text(label)
                 .frame(width: 50, alignment: .leading)
@@ -77,14 +64,21 @@ struct PIDControlsView: View {
             .frame(width: 28, height: 28)
             .buttonStyle(.bordered)
 
-            ZStack {
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(Color(.systemGray6))
-                    .frame(width: 60, height: 28)
-
-                CustomTextField(text: text, keyboardType: .decimalPad)
-                    .frame(width: 60, height: 28)
-            }
+            TextField("", text: text)
+                .textFieldStyle(.roundedBorder)  // Normal iOS field (white inside)
+                .keyboardType(.decimalPad)
+                .multilineTextAlignment(.trailing)
+                .frame(width: 60, height: 28)
+                .onSubmit {
+                    if let newValue = Float(text.wrappedValue) {
+                        value.wrappedValue = newValue
+                    }
+                }
+                .onChange(of: text.wrappedValue) {   // <-- FIXED: No deprecated parameter
+                    if let newVal = Float(text.wrappedValue) {
+                        value.wrappedValue = newVal
+                    }
+                }
 
             Button("+") {
                 if let current = Float(text.wrappedValue) {

@@ -2,7 +2,6 @@ import SwiftUI
 
 struct ContentView: View {
     @StateObject private var udpManager = UDPManager()
-    @StateObject private var keyboard = KeyboardResponder()
 
     @State private var showPIDEditor = true
     @State private var showSettingsSheet = false
@@ -16,18 +15,17 @@ struct ContentView: View {
                     if sizeClass == .regular && showPIDEditor {
                         pidEditor
                             .frame(width: 220)
-                            .background(Color(.systemGroupedBackground))
+                            .background(Color(.secondarySystemGroupedBackground))  // <-- FULL gray background for left side
                             .transition(.move(edge: .leading))
                     }
 
                     graphAndControls
                         .frame(width: sizeClass == .regular && showPIDEditor ? geometry.size.width - 220 : geometry.size.width)
-                        .background(Color(.secondarySystemBackground))
+                        .background(Color.white)
                 }
                 .gesture(dragGesture)
             }
         }
-        .padding(.bottom, keyboard.currentHeight) // <-- This moves everything up
         .background(Color.clear)
         .sheet(isPresented: $showSettingsSheet) {
             settingsSheet
@@ -36,9 +34,6 @@ struct ContentView: View {
             rawPacketSheet
         }
         .ignoresSafeArea(.container, edges: .horizontal)
-        .onTapGesture {
-            UIApplication.shared.hideKeyboard() // <-- Hide keyboard if you tap outside
-        }
     }
 
     var pidEditor: some View {
@@ -52,11 +47,12 @@ struct ContentView: View {
 
                 PIDControlsView()
             }
-            .frame(width: 220)
+            .padding()
+            .background(Color(.secondarySystemGroupedBackground)) // Gray box around controls
+            .cornerRadius(16)
 
             Spacer()
         }
-        .background(Color(.systemGroupedBackground))
     }
 
     var graphAndControls: some View {
@@ -121,11 +117,5 @@ struct ContentView: View {
                     }
                 }
             }
-    }
-}
-
-extension UIApplication {
-    func hideKeyboard() {
-        sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
 }
