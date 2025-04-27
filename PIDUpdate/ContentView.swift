@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
     @StateObject private var udpManager = UDPManager()
+    @StateObject private var keyboard = KeyboardResponder()
 
     @State private var showPIDEditor = true
     @State private var showSettingsSheet = false
@@ -26,6 +27,7 @@ struct ContentView: View {
                 .gesture(dragGesture)
             }
         }
+        .padding(.bottom, keyboard.currentHeight) // <-- This moves everything up
         .background(Color.clear)
         .sheet(isPresented: $showSettingsSheet) {
             settingsSheet
@@ -33,13 +35,15 @@ struct ContentView: View {
         .sheet(isPresented: $showRawPackets) {
             rawPacketSheet
         }
-        .ignoresSafeArea(.container, edges: .horizontal)  // <-- ADD THIS TO FIX LEFT/RIGHT PADDING
+        .ignoresSafeArea(.container, edges: .horizontal)
+        .onTapGesture {
+            UIApplication.shared.hideKeyboard() // <-- Hide keyboard if you tap outside
+        }
     }
 
-    // PID editor with scrollable view
     var pidEditor: some View {
         VStack {
-            Spacer() // <- Top spacer to help center
+            Spacer()
 
             VStack(spacing: 8) {
                 Text("Controls")
@@ -50,23 +54,20 @@ struct ContentView: View {
             }
             .frame(width: 220)
 
-            Spacer() // <- Bottom spacer to help center
+            Spacer()
         }
         .background(Color(.systemGroupedBackground))
     }
 
-    // Graph area with floating settings button
     var graphAndControls: some View {
         ZStack(alignment: .topTrailing) {
             GraphView(dataPoints: udpManager.dataPoints, showSettingsSheet: $showSettingsSheet)
-
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Color.white)
                 .ignoresSafeArea(.container, edges: .horizontal)
         }
     }
 
-    // Settings sheet (small pull-up panel)
     var settingsSheet: some View {
         VStack(spacing: 16) {
             Button("Clear Graph") {
@@ -88,13 +89,12 @@ struct ContentView: View {
             }
         }
         .padding()
-        .frame(maxWidth: .infinity) // <- Fill horizontally
-        .background(Color(.systemBackground)) // <- Nice background
-        .presentationDetents([.height(220)])   // <- REAL FIX: small fixed height
+        .frame(maxWidth: .infinity)
+        .background(Color(.systemBackground))
+        .presentationDetents([.height(220)])
         .presentationDragIndicator(.visible)
     }
 
-    // Raw packet viewer
     var rawPacketSheet: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 10) {
@@ -110,7 +110,6 @@ struct ContentView: View {
         }
     }
 
-    // Swipe gesture for PID panel
     var dragGesture: some Gesture {
         DragGesture()
             .onEnded { value in
@@ -122,5 +121,11 @@ struct ContentView: View {
                     }
                 }
             }
+    }
+}
+
+extension UIApplication {
+    func hideKeyboard() {
+        sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
 }
