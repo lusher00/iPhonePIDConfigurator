@@ -11,8 +11,6 @@ struct GraphView: View {
     @State private var showD = false
     @State private var showOutput = true
 
-    @State private var showKeyPanel = false
-
     private let colors: [String: Color] = [
         "Setpoint": .blue,
         "Error": .red,
@@ -22,114 +20,121 @@ struct GraphView: View {
         "Output": .black
     ]
 
+    let sampleRateHz: Double = 100.0 // 100Hz
+
     var body: some View {
         VStack(spacing: 0) {
-            GeometryReader { geometry in
-                ZStack(alignment: .topTrailing) {
-                    Canvas { context, size in
-                        let visiblePoints = dataPoints.suffix(1000)
-                        let pointsArray = Array(visiblePoints)
+            ZStack(alignment: .topTrailing) {
+                Canvas { context, size in
+                    let pointsArray = Array(dataPoints.suffix(1000))
 
-                        let width = size.width
-                        let height = size.height
-                        let count = pointsArray.count
+                    guard pointsArray.count > 1 else { return }
 
-                        guard count > 1 else { return }
+                    let width = size.width
+                    let height = size.height
+                    let count = pointsArray.count
+                    let xStep = width / CGFloat(count - 1)
 
-                        let xStep = width / CGFloat(count - 1)
+                    // Find maximum absolute value for Y scaling
+                    let allValues = pointsArray.flatMap { point -> [Float] in
+                        var vals: [Float] = []
+                        if showSetpoint { vals.append(point.setpoint) }
+                        if showError { vals.append(point.error) }
+                        if showP { vals.append(point.p) }
+                        if showI { vals.append(point.i) }
+                        if showD { vals.append(point.d) }
+                        if showOutput { vals.append(point.output) }
+                        return vals
+                    }
 
-                        let allValues = pointsArray.flatMap { point -> [Float] in
-                            var vals: [Float] = []
-                            if showSetpoint { vals.append(point.setpoint) }
-                            if showError { vals.append(point.error) }
-                            if showP { vals.append(point.p) }
-                            if showI { vals.append(point.i) }
-                            if showD { vals.append(point.d) }
-                            if showOutput { vals.append(point.output) }
-                            return vals
-                        }
+                    guard let maxAbsValue = allValues.map({ abs($0) }).max(), maxAbsValue > 0 else { return }
 
-                        guard let minVal = allValues.min(), let maxVal = allValues.max(), maxVal - minVal > 0 else { return }
+                    func yPosition(_ value: Float) -> CGFloat {
+                        let norm = CGFloat(value) / CGFloat(maxAbsValue)
+                        return height/2 - norm * height/2
+                    }
 
-                        func yPosition(_ value: Float) -> CGFloat {
-                            let norm = (value - minVal) / (maxVal - minVal)
-                            return height * (1 - CGFloat(norm))
-                        }
+                    func xPosition(index: Int) -> CGFloat {
+                        return CGFloat(index) * xStep
+                    }
 
-                        if showSetpoint {
-                            drawLine(context: context, points: pointsArray.map { $0.setpoint }, color: colors["Setpoint"] ?? .blue, size: size, xStep: xStep, yFunc: yPosition)
-                        }
-                        if showError {
-                            drawLine(context: context, points: pointsArray.map { $0.error }, color: colors["Error"] ?? .red, size: size, xStep: xStep, yFunc: yPosition)
-                        }
-                        if showP {
-                            drawLine(context: context, points: pointsArray.map { $0.p }, color: colors["P"] ?? .green, size: size, xStep: xStep, yFunc: yPosition)
-                        }
-                        if showI {
-                            drawLine(context: context, points: pointsArray.map { $0.i }, color: colors["I"] ?? .purple, size: size, xStep: xStep, yFunc: yPosition)
-                        }
-                        if showD {
-                            drawLine(context: context, points: pointsArray.map { $0.d }, color: colors["D"] ?? .orange, size: size, xStep: xStep, yFunc: yPosition)
-                        }
-                        if showOutput {
-                            drawLine(context: context, points: pointsArray.map { $0.output }, color: colors["Output"] ?? .black, size: size, xStep: xStep, yFunc: yPosition)
+                    // Draw Y=0 axis
+                    var zeroAxis = Path()
+                    zeroAxis.move(to: CGPoint(x: 0, y: height/2))
+                    zeroAxis.addLine(to: CGPoint(x: width, y: height/2))
+                    context.stroke(zeroAxis, with: .color(.gray), lineWidth: 1)
+
+                    // Draw Y ticks
+                    let yTickValues: [Float] = [-1.0, -0.5, 0.0, 0.5, 1.0]
+                    for v in yTickValues {
+                        let y = yPosition(v * Float(maxAbsValue))
+                        var tick = Path()
+                        tick.move(to: CGPoint(x: 0, y: y))
+                        tick.addLine(to: CGPoint(x: 10, y: y))
+                        context.stroke(tick, with: .color(.gray), lineWidth: 1)
+
+                        let text = Text(String(format: "%.1f", v * maxAbsValue))
+                            .font(.system(size: 10))
+                            .foregroundColor(.gray)
+                        context.draw(text, at: CGPoint(x: 15, y: y - 6))
+                    }
+
+                    // Draw X ticks based on total seconds
+                    let totalSeconds = Double(dataPoints.count) / sampleRateHz
+                    let numSeconds = Int(totalSeconds) + 1
+
+                    for sec in 0...numSeconds {
+                        let indexAtSecond = Int(Double(sec) * sampleRateHz)
+                        if indexAtSecond < count {
+                            let x = xPosition(index: indexAtSecond)
+                            var tick = Path()
+                            tick.move(to: CGPoint(x: x, y: height - 10))
+                            tick.addLine(to: CGPoint(x: x, y: height))
+                            context.stroke(tick, with: .color(.gray), lineWidth: 1)
+
+                            let text = Text("\(sec)")
+                                .font(.system(size: 10))
+                                .foregroundColor(.gray)
+                            context.draw(text, at: CGPoint(x: x + 2, y: height - 18))
                         }
                     }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Color.white)
-                    .gesture(DragGesture()
-                        .onEnded { value in
-                            if value.translation.width < -100 {
-                                withAnimation { showKeyPanel = true }
-                            } else if value.translation.width > 100 {
-                                withAnimation { showKeyPanel = false }
-                            }
-                        })
 
-                    Button(action: {
-                        showSettingsSheet.toggle()
-                    }) {
-                        Image(systemName: "ellipsis.circle.fill")
-                            .resizable()
-                            .frame(width: 28, height: 28)
-                            .padding(8)
-                            .foregroundColor(.blue)
+                    // Draw graph lines
+                    if showSetpoint {
+                        drawLine(context: context, points: pointsArray.map { $0.setpoint }, color: colors["Setpoint"] ?? .blue, xFunc: xPosition, yFunc: yPosition)
                     }
-                    .padding([.top, .trailing], 12)
+                    if showError {
+                        drawLine(context: context, points: pointsArray.map { $0.error }, color: colors["Error"] ?? .red, xFunc: xPosition, yFunc: yPosition)
+                    }
+                    if showP {
+                        drawLine(context: context, points: pointsArray.map { $0.p }, color: colors["P"] ?? .green, xFunc: xPosition, yFunc: yPosition)
+                    }
+                    if showI {
+                        drawLine(context: context, points: pointsArray.map { $0.i }, color: colors["I"] ?? .purple, xFunc: xPosition, yFunc: yPosition)
+                    }
+                    if showD {
+                        drawLine(context: context, points: pointsArray.map { $0.d }, color: colors["D"] ?? .orange, xFunc: xPosition, yFunc: yPosition)
+                    }
+                    if showOutput {
+                        drawLine(context: context, points: pointsArray.map { $0.output }, color: colors["Output"] ?? .black, xFunc: xPosition, yFunc: yPosition)
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color.white)
 
-                    if showKeyPanel {
-                        VStack(alignment: .leading, spacing: 8) {
-                            ForEach(keyEntries(), id: \.0) { (label, color, value) in
-                                HStack(spacing: 6) {
-                                    Rectangle()
-                                        .fill(color)
-                                        .frame(width: 12, height: 12)
-                                        .cornerRadius(2)
-
-                                    Text(label)
-                                        .font(.caption)
-
-                                    Spacer()
-
-                                    Text(String(format: "%.2f", value))
-                                        .font(.caption)
-                                        .frame(width: 50, alignment: .trailing)
-                                }
-                            }
-                        }
-                        .padding()
-                        .frame(width: 160)
-                        .background(Color(.systemGray6).opacity(0.95))
-                        .cornerRadius(12)
-                        .padding(.top, 50)
+                Button(action: {
+                    showSettingsSheet.toggle()
+                }) {
+                    Image(systemName: "ellipsis.circle.fill")
+                        .resizable()
+                        .frame(width: 28, height: 28)
+                        .padding(8)
                         .padding(.trailing, 12)
-                        .transition(.move(edge: .trailing))
-                        .animation(.easeInOut(duration: 0.3), value: showKeyPanel)
-                    }
+                        .foregroundColor(.blue)
                 }
             }
 
-            scrollableCheckboxes()  // <--- Put the checkboxes back below
+            scrollableCheckboxes()
                 .padding(.bottom)
         }
     }
@@ -138,54 +143,28 @@ struct GraphView: View {
     func scrollableCheckboxes() -> some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 20) {
-                checkbox(label: "Set", binding: $showSetpoint)
-                checkbox(label: "Err", binding: $showError)
-                checkbox(label: "P", binding: $showP)
-                checkbox(label: "I", binding: $showI)
-                checkbox(label: "D", binding: $showD)
-                checkbox(label: "Out", binding: $showOutput)
+                Toggle("Set", isOn: $showSetpoint)
+                    .toggleStyle(CheckboxToggleStyle())
+                Toggle("Err", isOn: $showError)
+                    .toggleStyle(CheckboxToggleStyle())
+                Toggle("P", isOn: $showP)
+                    .toggleStyle(CheckboxToggleStyle())
+                Toggle("I", isOn: $showI)
+                    .toggleStyle(CheckboxToggleStyle())
+                Toggle("D", isOn: $showD)
+                    .toggleStyle(CheckboxToggleStyle())
+                Toggle("Out", isOn: $showOutput)
+                    .toggleStyle(CheckboxToggleStyle())
             }
             .padding()
             .font(.headline)
         }
     }
 
-    func checkbox(label: String, binding: Binding<Bool>) -> some View {
-        Toggle(label, isOn: binding)
-            .toggleStyle(CheckboxToggleStyle())
-    }
-
-    private func keyEntries() -> [(String, Color, Float)] {
-        guard let lastPoint = dataPoints.last else { return [] }
-
-        var entries: [(String, Color, Float)] = []
-
-        if showSetpoint {
-            entries.append(("Set", colors["Setpoint"] ?? .blue, lastPoint.setpoint))
-        }
-        if showError {
-            entries.append(("Err", colors["Error"] ?? .red, lastPoint.error))
-        }
-        if showP {
-            entries.append(("P", colors["P"] ?? .green, lastPoint.p))
-        }
-        if showI {
-            entries.append(("I", colors["I"] ?? .purple, lastPoint.i))
-        }
-        if showD {
-            entries.append(("D", colors["D"] ?? .orange, lastPoint.d))
-        }
-        if showOutput {
-            entries.append(("Out", colors["Output"] ?? .black, lastPoint.output))
-        }
-
-        return entries
-    }
-
-    private func drawLine(context: GraphicsContext, points: [Float], color: Color, size: CGSize, xStep: CGFloat, yFunc: (Float) -> CGFloat) {
+    func drawLine(context: GraphicsContext, points: [Float], color: Color, xFunc: (Int) -> CGFloat, yFunc: (Float) -> CGFloat) {
         var path = Path()
         for (i, value) in points.enumerated() {
-            let x = CGFloat(i) * xStep
+            let x = xFunc(i)
             let y = yFunc(value)
             if i == 0 {
                 path.move(to: CGPoint(x: x, y: y))

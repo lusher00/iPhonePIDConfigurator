@@ -33,7 +33,7 @@ class UDPManager: ObservableObject {
     private var socketFD: Int32 = -1
     private var listeningQueue = DispatchQueue(label: "udp-listener")
     private var lastSeq: UInt32?
-    private let maxPoints = 1000
+    private let maxPoints = 10000
 
     private let port: UInt16 = 3333
 
